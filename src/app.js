@@ -4,12 +4,10 @@ import multer from "multer";
 import csvParser from "csv-parser";
 import fs from "fs";
 import swaggerUi from "swagger-ui-express";
-import { PrismaClient } from "@prisma/client";
 import dotenv from 'dotenv';
+import prisma from "./utils/prismaClient.js";
 
 const app = express();
-const prisma = new PrismaClient();
-
 
 /**************/
 //   Config   //
@@ -132,6 +130,8 @@ app.post('/upload', upload.single('file'), async (req, res) => {
           }
 
           if (results.length > 0) {
+            // SQLite does not support createMany :(
+            // This is inefficient but will do for now
             await Promise.all(
               results.map(async (log) => {
                 try {

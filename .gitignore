@@ -15,6 +15,6 @@ node_modules
 *.sw?
 
 # Dev file
-/prisma/.*.db
+/prisma/*.db
 
 package-lock.json
