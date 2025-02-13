@@ -15,6 +15,117 @@
     }
   },
   "paths": {
+    "/logs/aggregate": {
+      "get": {
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "Get aggregated log data",
+        "description": "Retrieves aggregated log data grouped by a specific field and timeframe.",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of logs per page",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "required": true,
+            "description": "Timeframe for aggregation (hourly, daily, weekly).",
+            "schema": {
+              "type": "string",
+              "enum": ["hourly", "daily", "weekly"]
+            }
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "required": true,
+            "description": "Field to aggregate (service, level, message).",
+            "schema": {
+              "type": "string",
+              "enum": ["service", "level", "message"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with aggregated log data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp of the aggregation."
+                      },
+                      "field": {
+                        "type": "string",
+                        "description": "Aggregated field value."
+                      },
+                      "total": {
+                        "type": "integer",
+                        "description": "Total count of logs for this aggregation."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/upload": {
       "post": {
         "security": [

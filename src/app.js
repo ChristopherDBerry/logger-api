@@ -6,6 +6,7 @@ import fs from "fs";
 import swaggerUi from "swagger-ui-express";
 import dotenv from 'dotenv';
 import prisma from "./utils/prismaClient.js";
+import { format } from 'date-fns';
 
 const app = express();
 
@@ -19,8 +20,6 @@ const PROCESS_ENV = process.env;
 const AUTH_TOKEN = PROCESS_ENV.AUTH_TOKEN
 const PORT = PROCESS_ENV.PORT
 
-console.log("port", PORT);
-
 const swaggerDocs = JSON.parse(fs.readFileSync(new URL("./swagger.json", import.meta.url), "utf8"));
 
 /**************/
@@ -33,6 +32,7 @@ const swaggerDocs = JSON.parse(fs.readFileSync(new URL("./swagger.json", import.
 export const PROTECTED_ROUTES = new Set([
   { method: "GET", path: "/logs" },
   { method: "DELETE", path: "/logs" },
+  { method: "GET", path: "/logs/aggregate" },
   { method: "POST", path: "/upload" }
 ]);
 
@@ -169,7 +169,6 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // Delete all logs
-
 app.delete('/logs', async (req, res) => {
   try {
     await prisma.log.deleteMany();
@@ -188,8 +187,62 @@ app.get("/logs", async (req, res) => {
     take: parseInt(limit),
     orderBy: { timestamp: "desc" },
   });
-  res.json(logs);
+  res.json({logs});
 });
+
+const TIMEFRAME_FORMATS = {
+  hourly: "yyyy-MM-dd HH:00:00",
+  daily: "yyyy-MM-dd 00:00:00",
+  weekly: "yyyy-ww"
+};
+
+const ALLOWED_FIELDS = ['service', 'level', 'message'];
+
+app.get('/logs/aggregate', async (req, res) => {
+  try {
+    const { timeframe, field, limit = 50, page = 1 } = req.query;
+    const parsedLimit = parseInt(limit, 10);
+    const parsedPage = parseInt(page, 10);
+
+    if (!TIMEFRAME_FORMATS[timeframe]) {
+      return res.status(400).json({ error: 'Invalid timeframe. Use hourly, daily, or weekly.' });
+    }
+    if (!ALLOWED_FIELDS.includes(field)) {
+      return res.status(400).json({ error: 'Invalid field. Use service, level, or message.' });
+    }
+    if (isNaN(parsedLimit) || parsedLimit <= 0) {
+      return res.status(400).json({ error: 'Invalid limit. Must be a positive number.' });
+    }
+    if (isNaN(parsedPage) || parsedPage <= 0) {
+      return res.status(400).json({ error: 'Invalid page. Must be a positive number.' });
+    }
+
+    const logs = await prisma.log.findMany({
+      select: {
+        timestamp: true,
+        [field]: true,
+      },
+      skip: (parsedPage - 1) * parsedLimit,
+      take: parsedLimit
+    });
+
+    const aggregatedLogs = logs.reduce((acc, log) => {
+      const formattedTime = format(new Date(log.timestamp), TIMEFRAME_FORMATS[timeframe]);
+      const key = `${formattedTime}-${log[field]}`;
+      if (!acc[key]) {
+        acc[key] = { time: formattedTime, [field]: log[field], total: 0 };
+      }
+      acc[key].total += 1;
+      return acc;
+    }, {});
+
+    res.json(Object.values(aggregatedLogs));
+  } catch (error) {
+    console.error('Error aggregating logs:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 
 // Start Server
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
